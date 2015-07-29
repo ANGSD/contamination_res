@@ -1,0 +1,52 @@
+import sys
+import os
+from __future__ import division
+
+popname="CEU"
+
+os.system("grep "+popname+" 20130606_sample_info.txt | cut -f 1 > samples.txt\n")
+os.system("zcat ALL.chrX.phase3_shapeit2_mvncall_integrated.20130502.genotypes.vcf.gz | head -n 54 |  tail -n 1 | cut -f 10- > 1000Gsamples.txt\n")
+os.system("zcat ALL.chrX.phase3_shapeit2_mvncall_integrated.20130502.genotypes.vcf.gz | tail -n +55 | cut -f 2,4,5 > pos")
+
+a=open("samples.txt", "r").readlines()
+
+for i in range(len(a)):
+	a[i]=a[i].split()[0]
+
+b=open("1000Gsamples.txt", "r").readlines()[0].split()
+
+idxs=[]
+for i in a:
+	if i in b:
+		idxs.append(str(b.index(i)+10))
+
+idxs=",".join(idxs)
+
+T=open("tmp.sh", 'w')
+T.write("paste <(cat pos) <(zcat ALL.chrX.phase3_shapeit2_mvncall_integrated.20130502.genotypes.vcf.gz | tail -n +55 | cut -f "+idxs+") > GTs.txt")
+T.close()
+
+os.system("bash tmp.sh")
+
+R=open("GTs.txt", "r").readlines()
+O=open("1000G_"+popname+".txt", 'w')
+
+for i in R:
+	l=i.split()
+	if len(l[1])==1 and len(l[2])==1:
+		alleles="".join(l[3:])
+		NumRef=0
+		NumAlt=0
+		for j in alleles:
+			if j=="0":
+				NumRef+=1
+			elif j=="1":
+				NumAlt+=1
+		AltFreq=NumAlt/(NumRef+NumAlt)
+		if AltFreq>0 and AltFreq<1:
+			O.write("%s\t%s\t%s\t+\t%s\n" % (int(l[0])-1, l[1], 1-AltFreq, l[2]))
+
+O.close()
+
+os.system("gzip 1000G_"+popname+".txt")
+
